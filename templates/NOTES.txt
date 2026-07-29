@@ -1,0 +1,10 @@
+nectar-tools cron jobs deployed.
+{{ if .Values.dryRun }}
+NOTE: dryRun is true, so commands using $yes run WITHOUT -y and make
+no changes. Set dryRun=false for production.
+{{ end }}
+List the CronJobs:
+  kubectl -n {{ .Release.Namespace }} get cronjobs -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Trigger one manually:
+  kubectl -n {{ .Release.Namespace }} create job --from=cronjob/{{ include "nectar-tools.fullname" . }}-audits-daily manual-audits-daily

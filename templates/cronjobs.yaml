@@ -1,0 +1,101 @@
+{{- range .Values.jobs }}
+{{- if .enabled }}
+{{- /* Per-job dryRun overrides the chart-wide default. `default`
+cannot be used here: it would turn an explicit `dryRun: false` back
+into the default. */}}
+{{- $dryRun := $.Values.dryRun }}
+{{- if hasKey . "dryRun" }}
+{{- $dryRun = .dryRun }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "nectar-tools.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "nectar-tools.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ .name }}
+spec:
+  schedule: {{ .schedule | quote }}
+  # The schedules are carried over from the cron host's local time.
+  timeZone: {{ $.Values.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ .activeDeadlineSeconds | default $.Values.activeDeadlineSeconds }}
+      template:
+        metadata:
+          {{- if $.Values.vault.enabled }}
+          annotations:
+            vault.hashicorp.com/role: "{{ $.Values.vault.role }}"
+            vault.hashicorp.com/agent-inject: "true"
+            # Init-container only: a sidecar would stop the Job from
+            # ever completing.
+            vault.hashicorp.com/agent-pre-populate-only: "true"
+            # Render to the tools' default config path so no -c flag
+            # is needed on any command.
+            vault.hashicorp.com/secret-volume-path: "/etc/nectar"
+            vault.hashicorp.com/agent-inject-secret-tools.ini: "{{ $.Values.vault.settings_secret }}"
+            # The whole ini file is stored verbatim under the
+            # 'tools.ini' key of the Vault secret.
+            vault.hashicorp.com/agent-inject-template-tools.ini: |
+              {{ print "{{- with secret \"" $.Values.vault.settings_secret "\" -}}" }}
+              {{ print "{{ index .Data.data \"tools.ini\" }}" }}
+              {{ print "{{- end -}}" }}
+          {{- end }}
+          labels:
+            {{- include "nectar-tools.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: {{ .name }}
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "nectar-tools.serviceAccountName" $ }}
+          {{- with $.Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: {{ .name }}
+              image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              {{- with $.Values.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              # Like the old cron wrapper scripts: $yes carries the
+              # -y flag, every command runs even if an earlier one
+              # fails, and any failure fails the Job.
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  {{- if $dryRun }}
+                  yes=''
+                  {{- else }}
+                  yes='-y'
+                  {{- end }}
+                  failed=0
+                  {{- range .commands }}
+                  {{ . }} || failed=1
+                  {{- end }}
+                  exit $failed
+              {{- with $.Values.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- if not $.Values.vault.enabled }}
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/nectar
+                  readOnly: true
+              {{- end }}
+          {{- if not $.Values.vault.enabled }}
+          volumes:
+            - name: config
+              secret:
+                secretName: {{ include "nectar-tools.fullname" $ }}-config
+          {{- end }}
+{{- end }}
+{{- end }}

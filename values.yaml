@@ -1,0 +1,161 @@
+# Default values for nectar-tools-helm.
+
+image:
+  repository: registry.rc.nectar.org.au/nectar/nectar-tools
+  tag: ''  # defaults to appVersion
+  pullPolicy: IfNotPresent
+
+# All nectar-tools commands default to dry run; -y makes them act.
+# Job commands reference a literal $yes token (mirroring the old cron
+# wrapper scripts): with dryRun true it expands to nothing, with
+# dryRun false to -y. Per-job dryRun overrides this chart-wide
+# default. Commands written without $yes always run in dry-run mode.
+# The default is the safe one; production sets dryRun to false.
+# By convention $yes goes last on each command, so the deliberate
+# exceptions (commands with no $yes at all) stand out.
+dryRun: true
+
+# CronJob timeZone; the schedules below are carried over unchanged
+# from the cron host's root crontab, which ran on local time.
+timeZone: 'Australia/Melbourne'
+
+# Kill a job that runs longer than this many seconds (override per
+# job, e.g. the monthly SU reports).
+activeDeadlineSeconds: 3600
+
+resources: {}
+
+# The defaults satisfy the 'restricted' Pod Security Standard.
+# uid/gid 42420 is the image's appuser (see the nectar-tools
+# Dockerfile).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 42420
+  runAsGroup: 42420
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# One CronJob per old crontab entry. Multi-command entries are the
+# old /usr/local/sbin wrapper scripts inlined.
+jobs:
+  # expire-projects.sh: default domain, then the Auckland domain.
+  - name: project-expiry
+    enabled: true
+    schedule: '40 1 * * *'
+    commands:
+      - nectar-allocation-expiry -q --all $yes
+      - nectar-pt-expiry -q --all $yes
+      - nectar-allocation-instance-expiry -q --all $yes
+      - nectar-allocation-expiry -q --all --domain b38a521521d844e49daf98571fa8a153 $yes
+      - nectar-pt-expiry -q --all --domain b38a521521d844e49daf98571fa8a153 $yes
+      - nectar-allocation-instance-expiry -q --all --domain b38a521521d844e49daf98571fa8a153 $yes
+  - name: account-expiry
+    enabled: true
+    schedule: '40 3 * * *'
+    commands:
+      - nectar-account-expiry -q --all $yes
+  - name: image-expiry
+    enabled: true
+    schedule: '40 4 * * *'
+    commands:
+      - nectar-image-expiry -q --all $yes
+  - name: jupyterhub-volume-expiry
+    enabled: true
+    schedule: '23 11 * * *'
+    commands:
+      - nectar-jupyterhub-volume-expiry -q --all $yes
+  - name: allocation-provisioning
+    enabled: true
+    schedule: '*/10 5-23 * * *'
+    commands:
+      - nectar-allocation-provisioner -q --all $yes
+  - name: su-reports
+    enabled: true
+    schedule: '0 10 1 * *'
+    activeDeadlineSeconds: 14400
+    commands:
+      - nectar-su-reports --all $yes
+  - name: audits-daily
+    enabled: true
+    schedule: '10 23 * * *'
+    commands:
+      - nectar-coe-audit $yes
+  # run-audits-weekly.sh. The flavor ensure_cost check deliberately
+  # has no $yes: it only ever reports.
+  - name: audits-weekly
+    enabled: true
+    schedule: '10 0 * * 1'
+    commands:
+      - nectar-app-audit nectar_tools.audit.app_catalog.environment:EnvironmentAuditor.check_environment_deleted_project $yes
+      - nectar-app-audit nectar_tools.audit.app_catalog.environment:EnvironmentAuditor.check_orphaned_tempest_envs $yes
+      - nectar-database-audit nectar_tools.audit.database.instance:DatabaseInstanceAuditor.clean_stale_secgroups $yes
+      - nectar-dns-audit $yes
+      - nectar-loadbalancer-audit --limit 10 $yes
+      - nectar-rating-audit nectar_tools.audit.rating.flavor:FlavorAuditor.ensure_flavor_spec $yes
+      - nectar-rating-audit nectar_tools.audit.rating.flavor:FlavorAuditor.ensure_cost
+      - nectar-rating-audit nectar_tools.audit.rating.reservation:ReservationFlavorAuditor.ensure_cost $yes
+      - nectar-metric-audit nectar_tools.audit.metric.resource_provider:ResourceProviderAuditor.ensure_exists $yes
+      - nectar-metric-audit nectar_tools.audit.metric.resource_provider:ResourceProviderAuditor.ensure_scope $yes
+      - nectar-metric-audit nectar_tools.audit.metric.resource_provider:ResourceProviderAuditor.ensure_site $yes
+      - nectar-metric-audit nectar_tools.audit.metric.tempest_test:TempestTestAuditor.ensure_site $yes
+      - nectar-metric-audit nectar_tools.audit.metric.idp:IDPAuditor.ensure_country $yes
+      - nectar-metric-audit nectar_tools.audit.metric.cinder_pool:CinderPoolAuditor.ensure_site $yes
+      - nectar-metric-audit nectar_tools.audit.metric.instance:InstanceAuditor.ensure_instance_consistency $yes
+      - nectar-metric-audit nectar_tools.audit.metric.reservation:ReservationAuditor.ensure_az_cat $yes
+  # These audits intentionally only ever run in dry-run mode (no
+  # $yes, and dryRun pinned so a chart-wide override cannot change
+  # that). Formerly six separate crontab entries staggered across
+  # Monday morning to avoid overlap on the cron host; here the
+  # commands run sequentially in one job, and each command runs even
+  # if an earlier one fails.
+  - name: report-audits
+    enabled: true
+    schedule: '8 0 * * 1'
+    dryRun: true
+    commands:
+      - nectar-identity-audit
+      - nectar-allocation-audit --all
+      - nectar-pt-audit --all
+      - nectar-compute-audit
+      - nectar-placement-audit
+      - nectar-project-allocation-audit --all
+
+# Configuration comes from Vault (agent injection) in production: the
+# whole tools.ini is stored verbatim under the 'tools.ini' key of the
+# Vault secret and rendered to /etc/nectar/tools.ini, the tools'
+# default config path.
+vault:
+  enabled: true
+  role: 'k8s'
+  settings_secret: 'path/to/vault/secret'
+
+# Fallback configuration, only used when vault.enabled is false
+# (dev/test clusters). Leave [logging] log_dir unset so logs go to
+# stdout for Kubernetes to capture; a [sentry] dsn reports errors to
+# GlitchTip.
+conf:
+  toolsIni: |
+    [openstack.client]
+    auth_url = https://keystone.example.org:5000/v3/
+    username = username
+    password = secret
+    project_name = project
+
+# The vault kubernetes-auth role is bound to this service account, so
+# the jobs must run as it rather than 'default'.
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ''
+
+nameOverride: ''
+fullnameOverride: 'nectar-tools'
