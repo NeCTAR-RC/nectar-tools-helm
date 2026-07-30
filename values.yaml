@@ -48,32 +48,32 @@ jobs:
     enabled: true
     schedule: '40 1 * * *'
     commands:
-      - nectar-allocation-expiry -q --all $yes
-      - nectar-pt-expiry -q --all $yes
-      - nectar-allocation-instance-expiry -q --all $yes
-      - nectar-allocation-expiry -q --all --domain b38a521521d844e49daf98571fa8a153 $yes
-      - nectar-pt-expiry -q --all --domain b38a521521d844e49daf98571fa8a153 $yes
-      - nectar-allocation-instance-expiry -q --all --domain b38a521521d844e49daf98571fa8a153 $yes
+      - nectar-allocation-expiry --all $yes
+      - nectar-pt-expiry --all $yes
+      - nectar-allocation-instance-expiry --all $yes
+      - nectar-allocation-expiry --all --domain b38a521521d844e49daf98571fa8a153 $yes
+      - nectar-pt-expiry --all --domain b38a521521d844e49daf98571fa8a153 $yes
+      - nectar-allocation-instance-expiry --all --domain b38a521521d844e49daf98571fa8a153 $yes
   - name: account-expiry
     enabled: true
     schedule: '40 3 * * *'
     commands:
-      - nectar-account-expiry -q --all $yes
+      - nectar-account-expiry --all $yes
   - name: image-expiry
     enabled: true
     schedule: '40 4 * * *'
     commands:
-      - nectar-image-expiry -q --all $yes
+      - nectar-image-expiry --all $yes
   - name: jupyterhub-volume-expiry
     enabled: true
     schedule: '23 11 * * *'
     commands:
-      - nectar-jupyterhub-volume-expiry -q --all $yes
+      - nectar-jupyterhub-volume-expiry --all $yes
   - name: allocation-provisioning
     enabled: true
     schedule: '*/10 5-23 * * *'
     commands:
-      - nectar-allocation-provisioner -q --all $yes
+      - nectar-allocation-provisioner --all $yes
   - name: su-reports
     enabled: true
     schedule: '0 10 1 * *'
