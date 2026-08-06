@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nectar-tools.fullname" . }}-config
+  labels:
+    {{- include "nectar-tools.labels" . | nindent 4 }}
+data:
+  nectar-tools.conf: |
+    {{- include "nectar-tools-conf" . | trim | nindent 4 }}

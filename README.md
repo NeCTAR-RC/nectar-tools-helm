@@ -27,19 +27,41 @@ All nectar-tools commands default to dry run and only act when passed
 
 ## Configuration
 
-The tools read `/etc/nectar/tools.ini`.
+nectar-tools uses oslo.config: the commands read
+`/etc/nectar-tools/nectar-tools.conf` (the default config path, so no
+`-c` flag is needed) plus any drop-ins under
+`/etc/nectar-tools/nectar-tools.conf.d/` (oslo.config's default config
+dir), with the drop-ins taking precedence.
 
-- **Vault (production, `vault.enabled: true`)**: the Vault agent
-  injector renders the file from the `tools.ini` key of
-  `vault.settings_secret`, which holds the entire ini file verbatim.
-  `secret-volume-path` is set to `/etc/nectar` so no `-c` flag is
-  needed. The kubernetes-auth role is bound to the chart's service
-  account name.
-- **Fallback (`vault.enabled: false`)**: a Secret is rendered from
-  `conf.toolsIni` and mounted at `/etc/nectar`.
+- **nectar-tools.conf** is rendered from the `conf` values into a
+  ConfigMap and mounted at `/etc/nectar-tools/nectar-tools.conf`. Each
+  key under `conf` is an ini section; each entry under a section
+  becomes an `option = value` line. It holds no secrets.
+- **Secrets (production, `vault.enabled: true`)**: the Vault agent
+  injector renders `secrets.conf` into
+  `/etc/nectar-tools/nectar-tools.conf.d/` from individual keys of
+  `vault.settings_secret`:
 
-Leave `[logging] log_dir` unset so logs go to stdout for Kubernetes
-to capture. Set `[sentry] dsn` to report errors to GlitchTip.
+  | Vault key          | Rendered option              |
+  |--------------------|------------------------------|
+  | `keystone_password` | `[service_auth] password`   |
+  | `transport_url`    | `[DEFAULT] transport_url` (optional) |
+  | `freshdesk_key`    | `[freshdesk] key` (optional) |
+  | `jupyterhub_token` | `[jupyterhub] token` (optional) |
+  | `kubernetes_token` | `[kubernetes_client] token` (optional) |
+  | `sentry_dsn`       | `[sentry] dsn` (optional)    |
+
+  The kubernetes-auth role is bound to the chart's service account
+  name.
+- **Fallback (`vault.enabled: false`, dev/test)**: only
+  nectar-tools.conf is present, so any secrets the commands need must
+  be put in `conf`,
+  where they end up in a world-readable ConfigMap. Dev/test clusters
+  only.
+
+Leave oslo.log's `log_dir`/`log_file` unset in `[DEFAULT]` so logs go
+to stderr for Kubernetes to capture. Set the `sentry_dsn` Vault key to
+report errors to GlitchTip.
 
 ## Monitoring
 

@@ -31,21 +31,7 @@ spec:
         metadata:
           {{- if $.Values.vault.enabled }}
           annotations:
-            vault.hashicorp.com/role: "{{ $.Values.vault.role }}"
-            vault.hashicorp.com/agent-inject: "true"
-            # Init-container only: a sidecar would stop the Job from
-            # ever completing.
-            vault.hashicorp.com/agent-pre-populate-only: "true"
-            # Render to the tools' default config path so no -c flag
-            # is needed on any command.
-            vault.hashicorp.com/secret-volume-path: "/etc/nectar"
-            vault.hashicorp.com/agent-inject-secret-tools.ini: "{{ $.Values.vault.settings_secret }}"
-            # The whole ini file is stored verbatim under the
-            # 'tools.ini' key of the Vault secret.
-            vault.hashicorp.com/agent-inject-template-tools.ini: |
-              {{ print "{{- with secret \"" $.Values.vault.settings_secret "\" -}}" }}
-              {{ print "{{ index .Data.data \"tools.ini\" }}" }}
-              {{ print "{{- end -}}" }}
+            {{- include "nectar-tools.vaultAnnotations" $ | nindent 12 }}
           {{- end }}
           labels:
             {{- include "nectar-tools.selectorLabels" $ | nindent 12 }}
@@ -85,17 +71,18 @@ spec:
               resources:
                 {{- toYaml . | nindent 16 }}
               {{- end }}
-              {{- if not $.Values.vault.enabled }}
+              # nectar-tools.conf at oslo.config's default path so no
+              # -c flag is needed on any command. A single-file subPath
+              # mount, so the Vault agent can still mount
+              # nectar-tools.conf.d alongside it.
               volumeMounts:
                 - name: config
-                  mountPath: /etc/nectar
+                  mountPath: /etc/nectar-tools/nectar-tools.conf
+                  subPath: nectar-tools.conf
                   readOnly: true
-              {{- end }}
-          {{- if not $.Values.vault.enabled }}
           volumes:
             - name: config
-              secret:
-                secretName: {{ include "nectar-tools.fullname" $ }}-config
-          {{- end }}
+              configMap:
+                name: {{ include "nectar-tools.fullname" $ }}-config
 {{- end }}
 {{- end }}

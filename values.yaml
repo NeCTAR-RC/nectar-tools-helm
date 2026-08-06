@@ -125,26 +125,40 @@ jobs:
       - nectar-placement-audit
       - nectar-project-allocation-audit --all
 
-# Configuration comes from Vault (agent injection) in production: the
-# whole tools.ini is stored verbatim under the 'tools.ini' key of the
-# Vault secret and rendered to /etc/nectar/tools.ini, the tools'
-# default config path.
+# Secrets come from Vault (agent injection) in production: the agent
+# renders a secrets.conf drop-in to /etc/nectar-tools/nectar-tools.conf.d/,
+# oslo.config's default config dir, which the tools read automatically
+# and which overrides nectar-tools.conf. Only the secret values live
+# in Vault, under individual keys of settings_secret:
+# keystone_password (required, the [service_auth] password) and
+# optionally transport_url (the [DEFAULT] oslo.messaging URL with the
+# rabbit credentials), freshdesk_key, jupyterhub_token,
+# kubernetes_token and sentry_dsn. Everything else is configured via
+# conf below.
 vault:
   enabled: true
   role: 'k8s'
   settings_secret: 'path/to/vault/secret'
 
-# Fallback configuration, only used when vault.enabled is false
-# (dev/test clusters). Leave [logging] log_dir unset so logs go to
-# stdout for Kubernetes to capture; a [sentry] dsn reports errors to
-# GlitchTip.
+# Non-secret configuration, rendered to
+# /etc/nectar-tools/nectar-tools.conf (the tools' default config path)
+# via a ConfigMap. Each key under conf is
+# an ini section; each entry under a section becomes an
+# option = value line. Leave oslo.log's log_dir/log_file unset in
+# [DEFAULT] so logs go to stderr for Kubernetes to capture; the
+# [sentry] dsn (from Vault) reports errors to GlitchTip. Secrets must
+# not go here except on dev/test clusters with vault.enabled false,
+# where the ConfigMap is the only config source.
 conf:
-  toolsIni: |
-    [openstack.client]
-    auth_url = https://keystone.example.org:5000/v3/
-    username = username
-    password = secret
-    project_name = project
+  service_auth:
+    auth_type: password
+    auth_url: https://keystone.rc.nectar.org.au:5000/v3/
+    username: username
+    project_name: project
+    user_domain_id: default
+    project_domain_id: default
+  sentry:
+    environment: production
 
 # The vault kubernetes-auth role is bound to this service account, so
 # the jobs must run as it rather than 'default'.
