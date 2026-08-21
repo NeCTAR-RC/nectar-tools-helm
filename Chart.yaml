@@ -2,7 +2,7 @@ apiVersion: v2
 name: nectar-tools-helm
 description: 'Nectar operational tools: runs the nectar-tools expiry, provisioning, reporting and audit commands as Kubernetes CronJobs, replacing the root crontab on the cron host.'
 type: application
-version: 1.0.0
+version: 1.0.1
 appVersion: 2.0.0
 sources:
 - https://github.com/NeCTAR-RC/nectar-tools-helm.git
