@@ -47,6 +47,7 @@ jobs:
   - name: project-expiry
     enabled: true
     schedule: '40 1 * * *'
+    activeDeadlineSeconds: 21600
     commands:
       - nectar-allocation-expiry --all $yes
       - nectar-pt-expiry --all $yes
@@ -117,6 +118,7 @@ jobs:
     enabled: true
     schedule: '8 0 * * 1'
     dryRun: true
+    activeDeadlineSeconds: 21600
     commands:
       - nectar-identity-audit
       - nectar-allocation-audit --all
