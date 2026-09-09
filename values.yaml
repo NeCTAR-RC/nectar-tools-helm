@@ -47,7 +47,9 @@ jobs:
   - name: project-expiry
     enabled: true
     schedule: '40 1 * * *'
-    activeDeadlineSeconds: 21600
+    # Runs are at ~5.5h and slowly growing; 8h keeps headroom while
+    # the growth is investigated.
+    activeDeadlineSeconds: 28800
     commands:
       - nectar-allocation-expiry --all $yes
       - nectar-pt-expiry --all $yes
@@ -118,7 +120,10 @@ jobs:
     enabled: true
     schedule: '8 0 * * 1'
     dryRun: true
-    activeDeadlineSeconds: 21600
+    # nectar-identity-audit alone has taken close to 4h on the
+    # current image, and five audits run after it; dry-run only, so a
+    # long leash is harmless.
+    activeDeadlineSeconds: 43200
     commands:
       - nectar-identity-audit
       - nectar-allocation-audit --all
@@ -159,6 +164,13 @@ conf:
     project_name: project
     user_domain_id: default
     project_domain_id: default
+    # keystoneauth per-request timeout in seconds. Without it a
+    # silently dropped connection blocks a tool forever and the job
+    # only dies at activeDeadlineSeconds with nothing run after the
+    # stuck command (this stalled report-audits for hours in
+    # production). With it the stuck call raises, the error goes to
+    # sentry and the rest of the job carries on.
+    timeout: 600
   sentry:
     environment: production
 
