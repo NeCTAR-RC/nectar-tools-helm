@@ -143,7 +143,8 @@ jobs:
 # keystone_password (required, the [service_auth] password) and
 # optionally transport_url (the [DEFAULT] oslo.messaging URL with the
 # rabbit credentials), freshdesk_key, jupyterhub_token,
-# kubernetes_token, trove_rabbitmq_password (the [trove]
+# kubernetes_token, capi_token (the [capi_client] token, for pausing
+# CAPI clusters on expiry), trove_rabbitmq_password (the [trove]
 # rabbitmq_password, for the trove RabbitMQ management API) and
 # sentry_dsn. Everything else is configured via conf below.
 vault:
@@ -185,6 +186,14 @@ conf:
   #   rabbitmq_url: https://rabbit.example.com:15671
   #   rabbitmq_username: nectar-tools
   #   rabbitmq_vhost: trove
+  # Project expiry pauses Cluster API reconciliation of CAPI-driver
+  # magnum clusters when it stops a project's resources, which needs
+  # access to the CAPI management cluster. The token is the capi_token
+  # Vault key; the host goes here, plus namespace_prefix if magnum's
+  # [capi_helm]/namespace_prefix is not the default 'magnum', e.g.
+  # capi_client:
+  #   host: https://capi.example.com:6443
+  #   namespace_prefix: magnum
 
 # The vault kubernetes-auth role is bound to this service account, so
 # the jobs must run as it rather than 'default'.
