@@ -49,6 +49,7 @@ dir), with the drop-ins taking precedence.
   | `freshdesk_key`    | `[freshdesk] key` (optional) |
   | `jupyterhub_token` | `[jupyterhub] token` (optional) |
   | `kubernetes_token` | `[kubernetes_client] token` (optional) |
+  | `trove_rabbitmq_password` | `[trove] rabbitmq_password` (optional) |
   | `sentry_dsn`       | `[sentry] dsn` (optional)    |
 
   The kubernetes-auth role is bound to the chart's service account
@@ -62,6 +63,13 @@ dir), with the drop-ins taking precedence.
 Leave oslo.log's `log_dir`/`log_file` unset in `[DEFAULT]` so logs go
 to stderr for Kubernetes to capture. Set the `sentry_dsn` Vault key to
 report errors to GlitchTip.
+
+The weekly database audit's `clean_stale_guestagent_queues` check
+deletes queues from the trove RabbitMQ vhost through the broker's
+management API. It needs `rabbitmq_url`, `rabbitmq_username` and
+optionally `rabbitmq_vhost` (default `trove`) under `conf.trove`, plus
+the `trove_rabbitmq_password` Vault key. Without them the check fails
+with a configuration error and the rest of the job carries on.
 
 ## Monitoring
 

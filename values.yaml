@@ -97,6 +97,9 @@ jobs:
       - nectar-app-audit nectar_tools.audit.app_catalog.environment:EnvironmentAuditor.check_environment_deleted_project $yes
       - nectar-app-audit nectar_tools.audit.app_catalog.environment:EnvironmentAuditor.check_orphaned_tempest_envs $yes
       - nectar-database-audit nectar_tools.audit.database.instance:DatabaseInstanceAuditor.clean_stale_secgroups $yes
+      # Needs the [trove] rabbitmq_* options (see conf) and the
+      # trove_rabbitmq_password Vault key.
+      - nectar-database-audit nectar_tools.audit.database.instance:DatabaseInstanceAuditor.clean_stale_guestagent_queues $yes
       - nectar-dns-audit $yes
       - nectar-loadbalancer-audit --limit 10 $yes
       - nectar-rating-audit nectar_tools.audit.rating.flavor:FlavorAuditor.ensure_flavor_spec $yes
@@ -140,8 +143,9 @@ jobs:
 # keystone_password (required, the [service_auth] password) and
 # optionally transport_url (the [DEFAULT] oslo.messaging URL with the
 # rabbit credentials), freshdesk_key, jupyterhub_token,
-# kubernetes_token and sentry_dsn. Everything else is configured via
-# conf below.
+# kubernetes_token, trove_rabbitmq_password (the [trove]
+# rabbitmq_password, for the trove RabbitMQ management API) and
+# sentry_dsn. Everything else is configured via conf below.
 vault:
   enabled: true
   role: 'k8s'
@@ -173,6 +177,14 @@ conf:
     timeout: 600
   sentry:
     environment: production
+  # The database audit's stale guestagent queue cleanup talks to the
+  # management API of the RabbitMQ broker trove uses. The password is
+  # the trove_rabbitmq_password Vault key; the rest goes here, e.g.
+  # trove:
+  #   project_id: <trove service project ID>
+  #   rabbitmq_url: https://rabbit.example.com:15671
+  #   rabbitmq_username: nectar-tools
+  #   rabbitmq_vhost: trove
 
 # The vault kubernetes-auth role is bound to this service account, so
 # the jobs must run as it rather than 'default'.
