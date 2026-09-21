@@ -95,6 +95,10 @@ vault.hashicorp.com/agent-inject-template-secrets.conf: |
   {{ print "[kubernetes_client]" }}
   {{ print "token={{ .Data.data.kubernetes_token }}" }}
   {{ print "{{- end }}" }}
+  {{ print "{{- if .Data.data.trove_rabbitmq_password }}" }}
+  {{ print "[trove]" }}
+  {{ print "rabbitmq_password={{ .Data.data.trove_rabbitmq_password }}" }}
+  {{ print "{{- end }}" }}
   {{ print "{{- if .Data.data.sentry_dsn }}" }}
   {{ print "[sentry]" }}
   {{ print "dsn={{ .Data.data.sentry_dsn }}" }}
