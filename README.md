@@ -49,6 +49,7 @@ dir), with the drop-ins taking precedence.
   | `freshdesk_key`    | `[freshdesk] key` (optional) |
   | `jupyterhub_token` | `[jupyterhub] token` (optional) |
   | `kubernetes_token` | `[kubernetes_client] token` (optional) |
+  | `capi_token`       | `[capi_client] token` (optional) |
   | `trove_rabbitmq_password` | `[trove] rabbitmq_password` (optional) |
   | `sentry_dsn`       | `[sentry] dsn` (optional)    |
 
@@ -70,6 +71,17 @@ management API. It needs `rabbitmq_url`, `rabbitmq_username` and
 optionally `rabbitmq_vhost` (default `trove`) under `conf.trove`, plus
 the `trove_rabbitmq_password` Vault key. Without them the check fails
 with a configuration error and the rest of the job carries on.
+
+Project expiry pauses Cluster API reconciliation of CAPI-driver magnum
+clusters when it stops a project's resources, and unpauses them when
+the expiry is reverted or the cluster is finally deleted. This needs
+access to the CAPI management cluster: `host` under `conf.capi_client`
+(plus `namespace_prefix` if magnum's `[capi_helm]/namespace_prefix` is
+not the default `magnum`) and the `capi_token` Vault key. The client is
+only built when a CAPI cluster actually needs pausing, so a deployment
+without CAPI clusters can leave both unset; with CAPI clusters and no
+config, stopping the project's resources fails with a configuration
+error.
 
 ## Monitoring
 
