@@ -123,17 +123,19 @@ jobs:
     enabled: true
     schedule: '8 0 * * 1'
     dryRun: true
-    # nectar-identity-audit alone has taken close to 4h on the
-    # current image, and five audits run after it; dry-run only, so a
-    # long leash is harmless.
+    # nectar-identity-audit runs last: its deleted-project check made
+    # one nova call per deleted project (tens of thousands) and on its
+    # own outran this deadline every week, so the other five audits
+    # must not queue behind it. Dry-run only, so a long leash is
+    # harmless.
     activeDeadlineSeconds: 43200
     commands:
-      - nectar-identity-audit
       - nectar-allocation-audit --all
       - nectar-pt-audit --all
       - nectar-compute-audit
       - nectar-placement-audit
       - nectar-project-allocation-audit --all
+      - nectar-identity-audit
 
 # Secrets come from Vault (agent injection) in production: the agent
 # renders a secrets.conf drop-in to /etc/nectar-tools/nectar-tools.conf.d/,
